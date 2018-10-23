@@ -186,27 +186,56 @@ def run_and_get_output(image,
                        config='',
                        nice=0,
                        return_bytes=False):
+    if isinstance(image, list):
+        temp_name_list, temp_file_list = [], []
+        try:
+            temp_name_list, temp_filename_list = list(zip(*map(save_image, image)))
+            input_name = tempfile.mktemp(prefix='tess_')
+            input_filename = input_name + os.extsep + 'TXT'
+            with open(input_filename, 'w') as f:
+                f.writelines([filename + '\n' for filename in temp_filename_list])
 
-    temp_name, input_filename = '', ''
-    try:
-        temp_name, input_filename = save_image(image)
-        kwargs = {
-            'input_filename': input_filename,
-            'output_filename_base': temp_name + '_out',
-            'extension': extension,
-            'lang': lang,
-            'config': config,
-            'nice': nice
-        }
+            kwargs = {
+                'input_filename': input_filename,
+                'output_filename_base': input_name + '_out',
+                'extension': extension,
+                'lang': lang,
+                'config': config,
+                'nice': nice
+            }
 
-        run_tesseract(**kwargs)
-        filename = kwargs['output_filename_base'] + os.extsep + extension
-        with open(filename, 'rb') as output_file:
-            if return_bytes:
-                return output_file.read()
-            return output_file.read().decode('utf-8').strip()
-    finally:
-        cleanup(temp_name)
+            run_tesseract(**kwargs)
+            filename = kwargs['output_filename_base'] + os.extsep + extension
+            with open(filename, 'rb') as output_file:
+                if return_bytes:
+                    return output_file.read()
+                return output_file.read().decode('utf-8').strip()
+        finally:
+            cleanup(input_filename)
+            for temp_name in temp_name_list:
+                cleanup(temp_name)
+
+    else:
+        temp_name, input_filename = '', ''
+        try:
+            temp_name, input_filename = save_image(image)
+            kwargs = {
+                'input_filename': input_filename,
+                'output_filename_base': temp_name + '_out',
+                'extension': extension,
+                'lang': lang,
+                'config': config,
+                'nice': nice
+            }
+
+            run_tesseract(**kwargs)
+            filename = kwargs['output_filename_base'] + os.extsep + extension
+            with open(filename, 'rb') as output_file:
+                if return_bytes:
+                    return output_file.read()
+                return output_file.read().decode('utf-8').strip()
+        finally:
+            cleanup(temp_name)
 
 
 def file_to_dict(tsv, cell_delimiter, str_col_idx):
@@ -295,10 +324,10 @@ def image_to_string(image,
 
 
 def image_to_pdf_or_hocr(image,
-                    lang=None,
-                    config='',
-                    nice=0,
-                    extension='pdf'):
+                         lang=None,
+                         config='',
+                         nice=0,
+                         extension='pdf'):
     '''
     Returns the result of a Tesseract OCR run on the provided image to string
     '''
