@@ -167,17 +167,15 @@ def run_tesseract(input_filename,
         cmd_args.append(extension)
 
     try:
-        proc = subprocess.Popen(cmd_args, **subprocess_args())
+        with subprocess.Popen(cmd_args, **subprocess_args(), close_fds=True) as proc:
+            status_code, error_string = proc.wait(), proc.stderr.read()
+
+            if status_code:
+                raise TesseractError(status_code, get_errors(error_string))
+
+            return True
     except OSError:
         raise TesseractNotFoundError()
-
-    status_code, error_string = proc.wait(), proc.stderr.read()
-    proc.stderr.close()
-
-    if status_code:
-        raise TesseractError(status_code, get_errors(error_string))
-
-    return True
 
 
 def run_and_get_output(image,
@@ -189,11 +187,11 @@ def run_and_get_output(image,
     if isinstance(image, list):
         temp_name_list, temp_file_list = [], []
         try:
-            temp_name_list, temp_filename_list = list(zip(*map(save_image, image)))
+            temp_name_list, temp_file_list = list(zip(*map(save_image, image)))
             input_name = tempfile.mktemp(prefix='tess_')
             input_filename = input_name + os.extsep + 'TXT'
             with open(input_filename, 'w') as f:
-                f.writelines([filename + '\n' for filename in temp_filename_list])
+                f.writelines([filename + '\n' for filename in temp_file_list])
 
             kwargs = {
                 'input_filename': input_filename,
@@ -211,10 +209,9 @@ def run_and_get_output(image,
                     return output_file.read()
                 return output_file.read().decode('utf-8').strip()
         finally:
-            cleanup(input_filename)
             for temp_name in temp_name_list:
                 cleanup(temp_name)
-
+            cleanup(input_filename)
     else:
         temp_name, input_filename = '', ''
         try:
